@@ -46,7 +46,7 @@
           color: var(--muted); }
   .pill svg { width: 15px; height: 15px; color: var(--muted); }
 
-  .app { display: grid; grid-template-columns: 290px minmax(0, 1fr); height: 100vh; }
+  .app { display: grid; grid-template-columns: 320px minmax(0, 1fr); height: 100vh; }
 
   /* --- левая колонка --- */
   aside { display: flex; flex-direction: column; min-height: 0; padding: 20px 14px; gap: 12px;
@@ -61,7 +61,8 @@
   .item:hover { background: var(--soft); }
   .item.active { background: var(--accent-soft); }
   .item .t { font-weight: 500; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .item .m { color: var(--muted); font-size: 12px; display: flex; gap: 6px; align-items: center; }
+  .item .m { color: var(--muted); font-size: 12px; display: flex; gap: 6px; align-items: center; white-space: nowrap; min-width: 0; }
+  .item .m > span:last-child { overflow: hidden; text-overflow: ellipsis; }
   .item .kebab { grid-row: 1 / 3; grid-column: 2; align-self: center; }
   .item input { font-size: 14px; font-weight: 500; padding: 2px 8px; border-radius: 8px; min-width: 0; }
   .hit { padding: 9px 12px; border-radius: 14px; cursor: pointer; font-size: 14px; }
@@ -130,7 +131,7 @@
   .icon svg { width: 16px; height: 16px; }
   .kebab { position: relative; }
   .kebab > .icon svg { width: 18px; height: 18px; }
-  .menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 5; min-width: 150px;
+  .menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 5; min-width: 180px;
           background: var(--page); border: 1px solid var(--line); border-radius: 14px; padding: 4px; display: none; }
   .kebab.open .menu { display: grid; }
   .menu button { text-align: left; border-radius: 10px; font-size: 14px; }
@@ -312,6 +313,10 @@ function callMenu(c) {
   const ren = h('button', { onclick: e => {
     e.stopPropagation(); kebab.classList.remove('open'); renameCall(c, kebab.closest('.item'));
   } }, 'Переименовать');
+  const copy = h('button', { disabled: c.status !== 'done', onclick: async e => {
+    e.stopPropagation(); kebab.classList.remove('open');
+    try { await copyText(await api('/api/calls/' + c.id)); } catch (err) { toast(err.message); }
+  } }, 'Скопировать текст');
   const del = h('button', { class: 'danger', onclick: e => {
     e.stopPropagation(); kebab.classList.remove('open'); deleteCall(c);
   } }, 'Удалить');
@@ -321,7 +326,7 @@ function callMenu(c) {
       document.querySelectorAll('.kebab.open').forEach(k => k.classList.remove('open'));
       kebab.classList.toggle('open', open);
     }),
-    h('div', { class: 'menu' }, ren, del));
+    h('div', { class: 'menu' }, copy, ren, del));
   return kebab;
 }
 // удаляем через 15 секунд, а до этого можно вернуть
@@ -349,11 +354,14 @@ function renderList() {
   if (!calls.length) { list.append(h('div', { class: 'muted', style: 'padding:12px' }, 'Пока нет звонков.')); return; }
   for (const c of calls) {
     let meta = dur(c.duration || 0);
-    if (c.status === 'running') meta = `${c.stage || 'Расшифровка'} · ${Math.round(c.progress * 100)}%`;
+    if (c.status === 'running') {  // «38% · разметка собеседников»
+      const stage = c.stage || 'Расшифровка';
+      meta = `${Math.round(c.progress * 100)}% · ${stage[0].toLowerCase() + stage.slice(1)}`;
+    }
     else if (c.status !== 'done') meta = `${STATUS[c.status]} · ${meta}`;
     list.append(h('div', { class: 'item' + (c.id === state.current ? ' active' : ''), onclick: () => openCall(c.id) },
       h('div', { class: 't', title: c.title }, c.title), callMenu(c),
-      h('div', { class: 'm' }, c.status !== 'done' ? h('span', { class: 'dot ' + c.status }) : null, meta)));
+      h('div', { class: 'm', title: meta }, c.status !== 'done' ? h('span', { class: 'dot ' + c.status }) : null, h('span', {}, meta))));
   }
 }
 
@@ -517,7 +525,7 @@ function renderCall(call) {
       } }, 'Указать, где она теперь')));
   }
   const tools = h('div', { class: 'tools' }, h('span', { class: 'tip', id: 'out' },
-    h('button', { class: 'btn', onclick: copyAll }, 'Скопировать'),
+    h('button', { class: 'btn', onclick: () => copyText(state.call) }, 'Скопировать текст'),
     downloadMenu(call)));
   if (call.media_exists) {
     player = h('div', { class: 'vwrap', id: 'vwrap' },
@@ -538,6 +546,8 @@ function renderCall(call) {
 
   const m = $('#media');
   if (m) {
+    // самый первый кадр у Телемоста чёрный — показываем первую секунду, если ещё никуда не перематывали
+    if (call.has_video) m.addEventListener('loadedmetadata', () => { if (m.currentTime === 0) m.currentTime = Math.min(1, m.duration / 2 || 0); }, { once: true });
     m.addEventListener('timeupdate', highlight);
     m.addEventListener('play', () => { state.follow = true; followButton(); });
     m.addEventListener('pause', followButton);
@@ -813,9 +823,9 @@ $('main').addEventListener('wheel', stopFollow, { passive: true });
 $('main').addEventListener('touchmove', stopFollow, { passive: true });
 $('#follow').addEventListener('click', () => { state.follow = true; highlight(true); followButton(); });
 
-async function copyAll() {
-  const nm = names();
-  const text = state.call.segments.map(s => `[${fmt(s.start)}] ${nm[s.speaker] ? nm[s.speaker].name : s.speaker}: ${s.text}`).join('\n');
+async function copyText(call) {
+  const nm = Object.fromEntries(call.speakers.map(s => [s.label, s]));
+  const text = call.segments.map(s => `[${fmt(s.start)}] ${nm[s.speaker] ? nm[s.speaker].name : s.speaker}: ${s.text}`).join('\n');
   await navigator.clipboard.writeText(text);
   toast('Расшифровка скопирована');
 }
