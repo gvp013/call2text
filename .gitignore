@@ -1,0 +1,20 @@
+# окружение
+.venv/
+__pycache__/
+*.pyc
+
+# база с расшифровками и именами собеседников — личные данные, не публиковать
+data/
+
+# результаты call2text и записи
+*.txt
+!requirements.txt
+*.webm
+*.mp4
+*.m4a
+*.mp3
+*.wav
+*.ogg
+
+.env
+.DS_Store

@@ -1,0 +1,17 @@
+# Проверенный набор: macOS (Apple Silicon), Python 3.12, FFmpeg 8
+torch==2.10.0
+torchaudio==2.10.0
+# нужна pyannote; если на Windows не загрузится — не страшно: звук ему передаём сами
+torchcodec==0.10.0
+# 5.x ломает remote code GigaAM (ошибка meta device)
+transformers==4.57.6
+huggingface-hub==0.36.2
+pyannote.audio==4.0.0
+numpy==2.5.4
+soundfile==0.14.0
+hydra-core==1.3.7
+omegaconf==2.3.1
+sentencepiece==0.2.2
+# 0.142+ требует opentelemetry-api>=1.44, а pyannote 4.0 — ровно 1.34
+fastapi==0.141.1
+uvicorn==0.54.0

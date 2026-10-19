@@ -1,0 +1,625 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>call2text</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --page: #ffffff; --soft: #f4f4f5; --line: #e6e6e8; --text: #111113; --muted: #77777f; --faint: #b8b8bf;
+    --accent: #0000ff; --accent-text: #ffffff; --accent-soft: #f0f0ff;
+    --run: #f0a33a; --ok: #2fb36b; --danger: #e5484d;
+    --s1: #0000ff; --s2: #e5484d; --s3: #f0a33a; --s4: #2fb36b; --s5: #8a56d8; --s6: #6b7f8f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --page: #0f0f11; --soft: #1c1c20; --line: #2a2a2f; --text: #ededf0; --muted: #8d8d96; --faint: #4a4a52;
+      --accent: #5b6cff; --accent-soft: #1a1c3a;
+      --s1: #5b6cff; --s2: #f07479; --s3: #f2b15c; --s4: #5ccf96; --s5: #b38cf2; --s6: #8fb0c0;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--page); color: var(--text);
+         font: 15px/1.55 "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+         font-feature-settings: "cv11", "ss01"; -webkit-font-smoothing: antialiased; }
+  button { font: inherit; color: inherit; background: none; border: 0; border-radius: 999px;
+           padding: 7px 14px; cursor: pointer; }
+  a { color: inherit; text-decoration: none; }
+  button:disabled { opacity: .5; cursor: default; }
+  .btn { background: var(--soft); }
+  .btn:hover { background: var(--line); }
+  .ink { background: var(--accent); color: var(--accent-text); font-weight: 500; padding: 8px 16px; }
+  .ink:hover { opacity: .9; }
+  button.danger { color: var(--danger); }
+  input, select { font: inherit; color: inherit; background: var(--page); border: 1px solid var(--line);
+                  border-radius: 12px; padding: 8px 12px; outline: none; }
+  input:focus, select:focus { border-color: var(--accent); }
+  select { appearance: none; -webkit-appearance: none; padding-right: 36px; cursor: pointer;
+           background: var(--page) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2377777f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center / 16px; }
+  input[type=checkbox] { accent-color: var(--accent); }
+  .muted { color: var(--muted); }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 0; font-size: 14px; white-space: nowrap;
+          color: var(--muted); }
+  .pill svg { width: 15px; height: 15px; color: var(--muted); }
+
+  .app { display: grid; grid-template-columns: 290px 1fr; height: 100vh; }
+
+  /* --- левая колонка --- */
+  aside { display: flex; flex-direction: column; min-height: 0; padding: 20px 14px; gap: 12px;
+          border-right: 1px solid var(--line); }
+  .brand { font-weight: 600; font-size: 17px; padding: 0 6px; display: flex; align-items: center;
+           justify-content: space-between; letter-spacing: -.01em; }
+  .brand .ink { padding: 6px 14px; font-size: 14px; }
+  aside input { background: var(--soft); border-color: transparent; }
+  .list { overflow-y: auto; flex: 1; display: grid; align-content: start; gap: 2px; }
+  .item { padding: 9px 6px 9px 12px; border-radius: 14px; cursor: pointer; display: grid; gap: 0 4px;
+          grid-template-columns: minmax(0, 1fr) auto; }
+  .item:hover { background: var(--soft); }
+  .item.active { background: var(--accent-soft); }
+  .item .t { font-weight: 500; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .item .m { color: var(--muted); font-size: 12px; display: flex; gap: 6px; align-items: center; }
+  .item .kebab { grid-row: 1 / 3; grid-column: 2; align-self: center; visibility: hidden; }
+  .item:hover .kebab, .item.active .kebab, .item .kebab.open { visibility: visible; }
+  .hit { padding: 9px 12px; border-radius: 14px; cursor: pointer; font-size: 14px; }
+  .hit:hover { background: var(--soft); }
+  .hit .m { color: var(--muted); font-size: 12px; }
+  mark { background: var(--accent-soft); color: var(--accent); border-radius: 3px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; background: var(--faint); }
+  .dot.running, .dot.queued { background: var(--run); animation: pulse 1.4s ease-in-out infinite; }
+  .dot.done { background: var(--ok); }
+  .dot.error { background: var(--danger); }
+  @keyframes pulse { 50% { opacity: .35; } }
+
+  /* --- звонок --- */
+  main { overflow-y: auto; min-height: 0; }
+  .card { max-width: 920px; margin: 0 auto; padding: 32px 40px 64px; display: grid; gap: 18px; }
+  .head { display: grid; gap: 14px; }
+  .title { min-width: 0; }
+  h1 { font-size: 30px; line-height: 1.2; font-weight: 600; margin: 0; letter-spacing: -.025em; }
+  h1 .icon { vertical-align: 5px; margin-left: 4px; opacity: 0; transition: opacity .15s; }
+  .title:hover h1 .icon, h1 .icon:focus-visible { opacity: 1; }
+  .title input { font-size: 26px; font-weight: 600; width: min(640px, 100%); padding: 2px 10px; letter-spacing: -.02em; }
+  .chips { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+  video { width: 100%; max-height: 46vh; background: #000; border-radius: 16px; display: block; }
+  audio { width: 100%; }
+  .bar { display: flex; gap: 8px 16px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+  .tools { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .seg { scroll-margin-top: 70px; }
+
+  .find { display: flex; align-items: center; gap: 2px; border: 1px solid var(--line); border-radius: 999px;
+          padding: 2px 4px 2px 12px; flex: 1; min-width: 200px; max-width: 360px; }
+  .find:focus-within { border-color: var(--accent); }
+  .find > svg { width: 16px; height: 16px; color: var(--muted); flex: none; }
+  .find input, aside .find input { border: 0; padding: 6px 4px; flex: 1; min-width: 0; background: none; }
+  .find .n { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; padding: 0 4px; }
+  .find .icon svg { width: 16px; height: 16px; }
+  aside .find { background: var(--soft); border-color: transparent; border-radius: 12px; max-width: none; flex: none;
+                padding: 2px 4px 2px 12px; }
+  aside .find:focus-within { border-color: var(--accent); background: var(--page); }
+  .find .nav { display: inline-flex; }
+  .seg .txt mark { background: var(--accent-soft); color: var(--accent); border-radius: 3px; }
+  .seg .txt mark.cur { background: var(--accent); color: var(--accent-text); }
+  #segs { padding-top: 2px; }
+  .seg { display: grid; grid-template-columns: 48px 140px 1fr; gap: 14px; padding: 9px 14px 9px 16px;
+         align-items: baseline; position: relative; border-radius: 12px; }
+  .seg.now { background: var(--accent-soft); }
+  .seg.now::before { content: ""; position: absolute; left: 4px; top: 12px; bottom: 12px; width: 3px;
+                     border-radius: 2px; background: var(--accent); }
+  .seg .time { color: var(--faint); font-size: 13px; cursor: pointer; font-variant-numeric: tabular-nums; }
+  .seg .time:hover { color: var(--accent); }
+  .seg .who { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 7px; min-width: 0; }
+  .seg .who::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--c); flex: none; }
+  .seg .who > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .seg .who .icon { padding: 2px; margin-left: -4px; opacity: 0; }
+  .seg:hover .who .icon, .seg .who .icon:focus { opacity: 1; }
+  .seg .who .icon svg { width: 13px; height: 13px; }
+  .seg .who input { width: 100%; padding: 1px 8px; font: inherit; font-weight: 600; border-radius: 8px; }
+  .seg .txt { outline: none; border-radius: 6px; padding: 0 2px; }
+  .seg .txt:focus { box-shadow: 0 0 0 2px var(--accent-soft); }
+  .foot { display: flex; justify-content: space-between; gap: 16px; font-size: 13px; color: var(--muted);
+          border-top: 1px solid var(--line); padding-top: 14px; }
+  .foot .path { color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+                direction: rtl; text-align: right; min-width: 0; }
+
+  .icon { padding: 5px; border-radius: 999px; color: var(--muted); display: inline-grid; place-items: center; line-height: 0; }
+  .icon:hover { color: var(--text); background: var(--soft); }
+  .icon svg { width: 16px; height: 16px; }
+  .kebab { position: relative; }
+  .kebab > .icon svg { width: 18px; height: 18px; }
+  .menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 5; min-width: 150px;
+          background: var(--page); border: 1px solid var(--line); border-radius: 14px; padding: 4px; display: none; }
+  .kebab.open .menu { display: grid; }
+  .menu button { text-align: left; border-radius: 10px; font-size: 14px; }
+  .menu button:hover { background: var(--soft); }
+  .menu a { padding: 7px 14px; border-radius: 10px; font-size: 14px; display: flex; justify-content: space-between; gap: 16px; }
+  .menu a:hover { background: var(--soft); }
+  .down .menu { left: 0; right: auto; }
+  .down > .btn { display: inline-flex; align-items: center; gap: 4px; }
+  .down > .btn svg { width: 15px; height: 15px; color: var(--muted); }
+
+  .progress { height: 4px; background: var(--soft); border-radius: 2px; overflow: hidden; }
+  .progress > div { height: 100%; background: var(--accent); width: 0; transition: width .4s; }
+  .banner { border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; display: grid; gap: 10px; }
+  .banner.err { border-color: var(--danger); }
+  #status:empty { display: none; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+  /* --- пустое состояние и настройка --- */
+  .empty { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
+  .empty .card { max-width: 480px; width: 100%; text-align: center; gap: 14px; padding: 40px;
+                 border: 1px dashed var(--line); border-radius: 24px; }
+  .empty .card.left { text-align: left; border-style: solid; }
+  .drop.over { border-color: var(--accent); background: var(--accent-soft); }
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--text);
+           color: var(--page); padding: 9px 16px; border-radius: 999px; opacity: 0; transition: opacity .2s;
+           pointer-events: none; font-size: 14px; }
+  .toast.show { opacity: 1; }
+  @media (max-width: 760px) {
+    .app { grid-template-columns: 1fr; height: auto; }
+    aside { max-height: 40vh; border-right: 0; border-bottom: 1px solid var(--line); }
+    .card { padding: 20px 16px 40px; }
+    h1 { font-size: 24px; }
+    .seg { grid-template-columns: 48px 1fr; padding: 9px 10px 9px 14px; }
+    .seg .txt { grid-column: 1 / -1; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="brand">call2text <button class="ink" id="pick">Добавить</button></div>
+    <div class="find" id="qbox"><input id="q" type="search" placeholder="Поиск по расшифровкам"></div>
+    <div class="list" id="list"></div>
+  </aside>
+  <main id="main"></main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (sel, el = document) => el.querySelector(sel);
+const h = (tag, attrs = {}, ...kids) => {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+    else if (k === 'class') el.className = v;
+    else if (k === 'html') el.innerHTML = v;
+    else if (v !== false && v != null) el.setAttribute(k, v === true ? '' : v);
+  }
+  for (const kid of kids.flat()) if (kid != null) el.append(kid);
+  return el;
+};
+const fmt = s => { s = Math.floor(s); const m = Math.floor(s / 60), r = s % 60, hh = Math.floor(m / 60);
+  return hh ? `${hh}:${String(m % 60).padStart(2, '0')}:${String(r).padStart(2, '0')}` : `${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}`; };
+const dur = s => s >= 3600 ? `${Math.floor(s / 3600)} ч ${Math.round(s % 3600 / 60)} мин` : `${Math.max(1, Math.round(s / 60))} мин`;
+const date = t => new Date(t * 1000).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+const plural = (n, one, few, many) => { const m10 = n % 10, m100 = n % 100;
+  return `${n} ${m10 === 1 && m100 !== 11 ? one : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? few : many}`; };
+const svg = path => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
+const PENCIL = svg('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>');
+const DOTS = svg('<circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>');
+const CALENDAR = svg('<rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>');
+const CLOCK = svg('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>');
+const pill = (html, text, attrs = {}) => { const p = h('span', { class: 'pill', ...attrs }); p.innerHTML = html; p.append(text); return p; };
+const icon = (html, title, onclick) => {
+  const b = h('button', { class: 'icon', title, 'aria-label': title, onclick });
+  b.innerHTML = html;
+  return b;
+};
+document.addEventListener('click', () => document.querySelectorAll('.kebab.open').forEach(k => k.classList.remove('open')));
+const STATUS = { queued: 'в очереди', running: 'расшифровка', done: 'готово', error: 'ошибка', cancelled: 'отменено' };
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...opts,
+    body: opts.body ? JSON.stringify(opts.body) : undefined });
+  if (!res.ok) {
+    let msg = 'Что-то пошло не так.';
+    try { msg = (await res.json()).detail || msg; } catch {}
+    throw new Error(msg);
+  }
+  return res.json();
+}
+function toast(text) {
+  const t = $('#toast'); t.textContent = text; t.classList.add('show');
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+const state = { calls: [], current: null, call: null, pending: null };
+
+// --- список ---
+async function loadList() {
+  state.calls = await api('/api/calls');
+  if ($('#q').value.trim() || $('#list .kebab.open')) return;  // не закрывать открытое меню
+  renderList();
+}
+function callMenu(c) {
+  let confirmDelete = false;
+  const del = h('button', { class: 'danger', onclick: async e => {
+    e.stopPropagation();
+    if (!confirmDelete) { confirmDelete = true; del.textContent = 'Точно удалить?';
+      setTimeout(() => { confirmDelete = false; del.textContent = 'Удалить'; }, 3000); return; }
+    kebab.classList.remove('open');
+    await api('/api/calls/' + c.id, { method: 'DELETE' });
+    toast('Расшифровка удалена. Сама запись не тронута.');
+    if (c.id === state.current) showEmpty();
+    await loadList();
+  } }, 'Удалить');
+  const kebab = h('div', { class: 'kebab', onclick: e => e.stopPropagation() },
+    icon(DOTS, 'Ещё', () => {
+      const open = !kebab.classList.contains('open');
+      document.querySelectorAll('.kebab.open').forEach(k => k.classList.remove('open'));
+      kebab.classList.toggle('open', open);
+    }),
+    h('div', { class: 'menu' }, del));
+  return kebab;
+}
+function renderList() {
+  const list = $('#list'); list.replaceChildren();
+  if (!state.calls.length) { list.append(h('div', { class: 'muted', style: 'padding:12px' }, 'Пока нет звонков.')); return; }
+  for (const c of state.calls) {
+    let meta = `${date(c.recorded_at)} · ${dur(c.duration || 0)}`;
+    if (c.status === 'running') meta = `${c.stage || 'Расшифровка'} · ${Math.round(c.progress * 100)}%`;
+    else if (c.status !== 'done') meta = `${STATUS[c.status]} · ${meta}`;
+    list.append(h('div', { class: 'item' + (c.id === state.current ? ' active' : ''), onclick: () => openCall(c.id) },
+      h('div', { class: 't', title: c.title }, c.title), callMenu(c),
+      h('div', { class: 'm' }, c.status !== 'done' ? h('span', { class: 'dot ' + c.status }) : null, meta)));
+  }
+}
+
+// --- поиск: список звонков слева + подсветка в открытом звонке ---
+const SEARCH = svg('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>');
+const UP = svg('<path d="m6 15 6-6 6 6"/>'), DOWN = svg('<path d="m6 9 6 6 6-6"/>');
+const find = { hits: [], i: 0 };
+$('#qbox').insertAdjacentHTML('afterbegin', SEARCH);
+$('#qbox').append(h('span', { class: 'n', id: 'find-n' }),
+  h('span', { class: 'nav', id: 'find-nav', hidden: true },
+    icon(UP, 'Предыдущее совпадение (Shift+Enter)', () => stepFind(-1)),
+    icon(DOWN, 'Следующее совпадение (Enter)', () => stepFind(1))));
+$('#q').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); stepFind(e.shiftKey ? -1 : 1); }
+  if (e.key === 'Escape') { e.target.value = ''; renderList(); applyFind(false); e.target.blur(); }
+});
+let searchTimer;
+$('#q').addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(async () => {
+    const q = $('#q').value.trim();
+    applyFind(true);
+    if (!q) return renderList();
+    const hits = await api('/api/search?q=' + encodeURIComponent(q));
+    const list = $('#list'); list.replaceChildren();
+    if (!hits.length) list.append(h('div', { class: 'muted', style: 'padding:12px' }, 'Ничего не найдено.'));
+    for (const r of hits) {
+      const i = r.text.toLowerCase().indexOf(q.toLowerCase());
+      const from = Math.max(0, i - 40);
+      const text = h('div', {}, (from ? '…' : '') + r.text.slice(from, i), h('mark', {}, r.text.slice(i, i + q.length)),
+        r.text.slice(i + q.length, i + q.length + 80) + '…');
+      list.append(h('div', { class: 'hit', onclick: () => openCall(r.call_id, r.start) },
+        h('div', { class: 'm' }, `${r.title} · ${r.speaker} · ${fmt(r.start)}`), text));
+    }
+  }, 250);
+});
+
+// --- новая запись ---
+$('#pick').addEventListener('click', pickFile);
+async function pickFile() {
+  try { showSetup(await api('/api/pick', { method: 'POST' })); }
+  catch (e) { if (e.message !== 'Файл не выбран.') toast(e.message); }
+}
+async function usePath(path) {
+  try { showSetup(await api('/api/probe', { method: 'POST', body: { path } })); }
+  catch (e) { toast(e.message); }
+}
+
+function showEmpty() {
+  state.current = null; state.call = null; renderList();
+  const drop = h('div', { class: 'card drop' },
+    h('div', { style: 'font-size:18px;font-weight:700' }, 'Новая расшифровка'),
+    h('div', { class: 'muted', style: 'font-size:13px' }, '.webm · .mp4 · .mov · .m4a · .mp3 · .ogg · .wav'),
+    h('div', {}, h('button', { class: 'ink', onclick: pickFile }, 'Выбрать файл…')),
+    h('div', { class: 'muted' }, 'или путь к файлу'),
+    h('div', { class: 'row', style: 'justify-content:center' },
+      h('input', { id: 'path', placeholder: '/Users/…/recording.webm', style: 'width:300px;font-size:13px',
+        onkeydown: e => e.key === 'Enter' && usePath(e.target.value) }),
+      h('button', { class: 'btn', onclick: () => usePath($('#path').value) }, 'Открыть')));
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+  drop.addEventListener('drop', e => {
+    e.preventDefault(); drop.classList.remove('over');
+    toast('Браузер не сообщает, где лежит файл. Нажмите «Выбрать файл…» или вставьте путь.');
+  });
+  $('#main').replaceChildren(h('div', { class: 'empty' }, drop));
+}
+
+function showSetup(file) {
+  state.pending = file;
+  const sp = h('select', { id: 'speakers' },
+    h('option', { value: '' }, 'автоматически'),
+    [1, 2, 3, 4, 5, 6].map(n => h('option', { value: n, selected: n === 2 }, String(n))));
+  const merge = h('input', { type: 'checkbox', id: 'merge', checked: true });
+  $('#main').replaceChildren(h('div', { class: 'empty' }, h('div', { class: 'card left' },
+    h('div', {}, h('div', { style: 'font-weight:700;font-size:16px;overflow-wrap:anywhere' }, file.name),
+      h('div', { class: 'muted', style: 'font-size:13px' }, dur(file.duration))),
+    file.duration > 7200 ? h('div', { class: 'banner' }, 'Запись длиннее 2 часов — расшифровка займёт заметно больше времени и памяти.') : null,
+    h('label', { class: 'row' }, 'Число собеседников:', sp),
+    h('label', { class: 'row' }, merge, 'Склеивать соседние реплики одного человека'),
+    h('div', { class: 'row' },
+      h('button', { class: 'ink', onclick: async e => {
+        e.currentTarget.disabled = true;
+        const btn = e.currentTarget;
+        try {
+          const { id } = await api('/api/calls', { method: 'POST',
+            body: { path: file.path, speakers: sp.value ? Number(sp.value) : null, merge: merge.checked } });
+          await loadList(); openCall(id);
+        } catch (err) { toast(err.message); btn.disabled = false; }
+      } }, 'Расшифровать'),
+      h('button', { class: 'btn', onclick: showEmpty }, 'Отменить')))));
+}
+
+// --- звонок ---
+let pollTimer;
+async function openCall(id, seekTo) {
+  clearTimeout(pollTimer);
+  const first = state.current !== id;
+  state.current = id;
+  let call;
+  try { call = await api('/api/calls/' + id); } catch (e) { toast(e.message); return showEmpty(); }
+  state.call = call;
+  if (!$('#q').value.trim()) renderList();
+  if (first || !$('#segs')) renderCall(call); else updateCall(call);
+  if (seekTo != null) {  // открыли из результатов поиска — встаём на совпадение в этой реплике
+    seek(seekTo, true);
+    const at = find.hits.findIndex(m => +m.closest('.seg').dataset.start === seekTo);
+    if (at !== -1) { find.i = at; showFind(true); }
+  }
+  if (call.status === 'queued' || call.status === 'running') pollTimer = setTimeout(() => openCall(id), 1500);
+}
+
+const color = idx => `var(--s${idx % 6 + 1})`;
+const names = () => Object.fromEntries(state.call.speakers.map(s => [s.label, s]));
+
+function renderCall(call) {
+  let player;
+  if (!call.media_exists) {
+    player = h('div', { class: 'banner err' },
+      h('div', {}, 'Запись не найдена: ', h('span', { class: 'muted', style: 'word-break:break-all;font-size:13px' }, call.path)),
+      h('div', {}, h('button', { class: 'btn', onclick: async () => {
+        try { await api(`/api/calls/${call.id}/relink`, { method: 'POST', body: {} }); renderCall(await api('/api/calls/' + call.id)); }
+        catch (e) { if (e.message !== 'Файл не выбран.') toast(e.message); }
+      } }, 'Указать, где она теперь')));
+  }
+  const tools = h('div', { class: 'tools' },
+    h('button', { class: 'btn', onclick: copyAll }, 'Скопировать'),
+    downloadMenu(call));
+  if (call.media_exists) {
+    player = h('div', { class: 'vwrap', id: 'vwrap' },
+      h(call.has_video ? 'video' : 'audio', { id: 'media', src: `/api/calls/${call.id}/media`, controls: true, preload: 'metadata' }));
+  }
+
+  $('#main').replaceChildren(h('div', { class: 'card' },
+    h('div', { class: 'head' },
+      h('div', { class: 'title', id: 'title' }, titleView(call)),
+      h('div', { class: 'bar' }, tools,
+        h('div', { class: 'chips' },
+          h('span', { class: 'pill', id: 'state' }),
+          pill(CALENDAR, date(call.recorded_at)),
+          pill(CLOCK, dur(call.duration || 0))))),
+    h('div', { id: 'status' }),
+    player,
+    h('div', { id: 'segs' }),
+    h('div', { class: 'foot' }, h('span', { id: 'foot' }), h('span', { class: 'path', title: call.path }, '‎' + call.path))));
+
+  const m = $('#media');
+  if (m) m.addEventListener('timeupdate', highlight);
+  updateCall(call);
+}
+
+function downloadMenu(call) {
+  const close = () => box.classList.remove('open');
+  const box = h('div', { class: 'kebab down', onclick: e => e.stopPropagation() },
+    h('button', { class: 'btn', onclick: () => {
+      const open = !box.classList.contains('open');
+      document.querySelectorAll('.kebab.open').forEach(k => k.classList.remove('open'));
+      box.classList.toggle('open', open);
+    }, html: 'Скачать' + svg('<path d="m6 9 6 6 6-6"/>') }),
+    h('div', { class: 'menu' },
+      h('a', { href: `/api/calls/${call.id}/export.txt`, onclick: close }, 'Текст', h('span', { class: 'muted' }, '.txt')),
+      h('a', { href: `/api/calls/${call.id}/export.md`, onclick: close }, 'Markdown', h('span', { class: 'muted' }, '.md'))));
+  return box;
+}
+
+function updateCall(call) {
+  const stateEl = $('#state');
+  stateEl.hidden = call.status === 'done';
+  stateEl.replaceChildren(h('span', { class: 'dot ' + call.status }), STATUS[call.status]);
+  $('#foot').textContent = call.status === 'running' ? `${(call.stage || 'расшифровка').toLowerCase()} · ${Math.round(call.progress * 100)}%`
+    : `${STATUS[call.status]} · ${plural(call.segments.length, 'реплика', 'реплики', 'реплик')}`;
+
+  const st = $('#status'); st.replaceChildren();
+  if (call.status === 'queued' || call.status === 'running') {
+    st.append(h('div', { class: 'banner' },
+      h('div', { class: 'row', style: 'justify-content:space-between' },
+        h('span', {}, call.status === 'queued' ? 'В очереди…' : `${call.stage || 'Расшифровка'} · ${Math.round(call.progress * 100)}%`),
+        h('button', { class: 'btn', onclick: async () => { await api(`/api/calls/${call.id}/cancel`, { method: 'POST' }); openCall(call.id); } }, 'Отменить')),
+      h('div', { class: 'progress' }, h('div', { style: `width:${Math.round(call.progress * 100)}%` }))));
+  } else if (call.status === 'error' || call.status === 'cancelled') {
+    st.append(h('div', { class: 'banner' + (call.status === 'error' ? ' err' : '') },
+      h('div', {}, call.status === 'error' ? call.error : 'Расшифровка отменена.'),
+      h('div', {}, h('button', { class: 'btn', onclick: async () => { await api(`/api/calls/${call.id}/retry`, { method: 'POST' }); openCall(call.id); } }, 'Повторить'))));
+  }
+
+  const segs = $('#segs');
+  const editing = document.activeElement && (document.activeElement.classList.contains('txt') ||
+    document.activeElement.closest('.who'));
+  if (editing && segs.children.length === call.segments.length) return;
+  const nm = names();
+  segs.replaceChildren(...call.segments.map(s => {
+    const who = nm[s.speaker];
+    const txt = h('div', { class: 'txt', contenteditable: 'plaintext-only', spellcheck: 'false' }, s.text);
+    txt.addEventListener('focus', () => { txt.textContent = txt.textContent; });  // без подсветки поиска при правке
+    txt.addEventListener('blur', async () => {
+      const text = txt.textContent.trim();
+      if (text === s.text) return;
+      try { await api('/api/segments/' + s.id, { method: 'PATCH', body: { text } }); s.text = text; toast('Сохранено'); }
+      catch (e) { toast(e.message); }
+      finally { applyFind(false); }
+    });
+    txt.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); txt.blur(); }
+      if (e.key === 'Escape') { txt.textContent = s.text; txt.blur(); } });
+    return h('div', { class: 'seg',
+        'data-start': s.start, 'data-end': s.end, 'data-speaker': s.speaker, style: `--c:${color(who ? who.idx : 0)}` },
+      h('div', { class: 'time', title: 'Перейти к этому моменту', onclick: () => seek(s.start, true) }, fmt(s.start)),
+      whoCell(who, s.speaker),
+      txt);
+  }));
+  if (!call.segments.length) segs.append(h('div', { class: 'muted', style: 'padding:10px 26px' },
+    call.status === 'done' ? 'В записи не нашлось речи.' : 'Реплики появятся по мере расшифровки.'));
+  applyFind(false);
+  highlight();
+}
+
+function applyFind(jump) {
+  const q = $('#q').value.trim().toLowerCase();
+  for (const txt of document.querySelectorAll('.seg .txt')) {
+    if (txt === document.activeElement) continue;
+    const text = txt.textContent, low = text.toLowerCase();
+    if (!q || !low.includes(q)) { if (txt.children.length) txt.textContent = text; continue; }
+    const parts = [];
+    let from = 0, at;
+    while ((at = low.indexOf(q, from)) !== -1) {
+      parts.push(text.slice(from, at), h('mark', {}, text.slice(at, at + q.length)));
+      from = at + q.length;
+    }
+    parts.push(text.slice(from));
+    txt.replaceChildren(...parts);
+  }
+  find.hits = [...document.querySelectorAll('.seg .txt mark')];
+  if (jump || find.i >= find.hits.length) find.i = 0;
+  showFind(jump);
+}
+
+function stepFind(d) {
+  if (!find.hits.length) return;
+  find.i = (find.i + d + find.hits.length) % find.hits.length;
+  showFind(true);
+}
+
+function showFind(scroll) {
+  find.hits.forEach((m, i) => m.classList.toggle('cur', i === find.i));
+  $('#find-n').textContent = find.hits.length ? `${find.i + 1} из ${find.hits.length}` : '';
+  $('#find-nav').hidden = !find.hits.length;
+  if (scroll && find.hits.length) {  // в середину видимой части, под прилипшим плеером
+    const main = $('main'), top = 0;
+    const box = main.getBoundingClientRect(), r = find.hits[find.i].getBoundingClientRect();
+    main.scrollBy({ top: r.top - box.top - top - (box.height - top) / 2, behavior: 'smooth' });
+  }
+}
+
+function whoCell(s, label) {
+  const cell = h('div', { class: 'who' }, h('span', {}, s ? s.name : label));
+  if (s) cell.append(icon(PENCIL, 'Переименовать собеседника во всех репликах', () => renameSpeaker(cell, s)));
+  return cell;
+}
+
+function renameSpeaker(cell, s) {
+  if (cell.querySelector('input')) return;
+  const input = h('input', { value: s.name });
+  cell.replaceChildren(input);
+  input.focus(); input.select();
+  let done = false;
+  const save = async ok => {
+    if (done) return; done = true;
+    const name = input.value.trim();
+    if (ok && name && name !== s.name) {
+      try { await api(`/api/calls/${state.call.id}/speakers/${encodeURIComponent(s.label)}`, { method: 'PATCH', body: { name } }); }
+      catch (e) { toast(e.message); }
+    }
+    input.remove();  // иначе updateCall решит, что идёт правка, и не перерисует реплики
+    openCall(state.call.id);
+  };
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') save(true); if (e.key === 'Escape') save(false); });
+  input.addEventListener('blur', () => save(true));
+}
+
+function titleView(call) {  // карандаш переносится вместе с последним словом
+  const i = call.title.lastIndexOf(' ') + 1;
+  return h('h1', {}, call.title.slice(0, i), h('span', { style: 'white-space:nowrap' }, call.title.slice(i),
+    icon(PENCIL, 'Переименовать встречу', () => renameTitle(call))));
+}
+
+function renameTitle(call) {
+  const box = $('#title');
+  if (box.querySelector('input')) return;
+  const input = h('input', { value: call.title });
+  box.replaceChildren(input);
+  input.focus(); input.select();
+  let done = false;
+  const save = async ok => {
+    if (done) return; done = true;
+    const name = input.value.trim();
+    if (ok && name && name !== call.title) {
+      try { await api('/api/calls/' + call.id, { method: 'PATCH', body: { name } }); call.title = name; loadList(); }
+      catch (e) { toast(e.message); }
+    }
+    box.replaceChildren(titleView(call));
+  };
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') save(true); if (e.key === 'Escape') save(false); });
+  input.addEventListener('blur', () => save(true));
+}
+
+function seek(t, play) {
+  const m = $('#media');
+  if (!m) return;
+  m.currentTime = t;
+  if (play) m.play().catch(() => {});
+  highlight(true);
+}
+
+let lastNow = null;
+function highlight(scroll) {
+  const m = $('#media');
+  if (!m) return;
+  const t = m.currentTime;
+  let now = null;
+  for (const el of document.querySelectorAll('.seg')) {
+    if (t >= +el.dataset.start && t < +el.dataset.end + 0.3) { now = el; break; }
+  }
+  if (now === lastNow && scroll !== true) return;
+  if (lastNow) lastNow.classList.remove('now');
+  if (now) { now.classList.add('now'); if (scroll === true || !m.paused) now.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+  lastNow = now;
+}
+
+async function copyAll() {
+  const nm = names();
+  const text = state.call.segments.map(s => `[${fmt(s.start)}] ${nm[s.speaker] ? nm[s.speaker].name : s.speaker}: ${s.text}`).join('\n');
+  await navigator.clipboard.writeText(text);
+  toast('Расшифровка скопирована');
+}
+
+// --- горячие клавиши ---
+document.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.code === 'KeyF' ) { e.preventDefault(); $('#q').focus(); $('#q').select(); return; }
+  const tag = document.activeElement && document.activeElement.tagName;
+  if (tag === 'INPUT' || tag === 'SELECT' || (document.activeElement && document.activeElement.isContentEditable)) return;
+  const m = $('#media');
+  if (!m) return;
+  if (e.code === 'Space') { e.preventDefault(); m.paused ? m.play() : m.pause(); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); m.currentTime = Math.max(0, m.currentTime - 5); }
+  else if (e.key === 'ArrowRight') { e.preventDefault(); m.currentTime += 5; }
+  else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+    e.preventDefault();
+    const starts = [...document.querySelectorAll('.seg')].map(el => +el.dataset.start);
+    const t = m.currentTime;
+    const target = e.key === 'ArrowDown' ? starts.find(s => s > t + 0.5) : [...starts].reverse().find(s => s < t - 1);
+    if (target != null) seek(target, !m.paused);
+  }
+});
+
+loadList().then(() => state.calls.length ? openCall(state.calls[0].id) : showEmpty());
+setInterval(loadList, 3000);
+</script>
+</body>
+</html>
