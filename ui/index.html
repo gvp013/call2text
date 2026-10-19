@@ -45,7 +45,7 @@
           color: var(--muted); }
   .pill svg { width: 15px; height: 15px; color: var(--muted); }
 
-  .app { display: grid; grid-template-columns: 290px 1fr; height: 100vh; }
+  .app { display: grid; grid-template-columns: 290px minmax(0, 1fr); height: 100vh; }
 
   /* --- левая колонка --- */
   aside { display: flex; flex-direction: column; min-height: 0; padding: 20px 14px; gap: 12px;
@@ -61,8 +61,8 @@
   .item.active { background: var(--accent-soft); }
   .item .t { font-weight: 500; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .item .m { color: var(--muted); font-size: 12px; display: flex; gap: 6px; align-items: center; }
-  .item .kebab { grid-row: 1 / 3; grid-column: 2; align-self: center; visibility: hidden; }
-  .item:hover .kebab, .item.active .kebab, .item .kebab.open { visibility: visible; }
+  .item .kebab { grid-row: 1 / 3; grid-column: 2; align-self: center; }
+  .item input { font-size: 14px; font-weight: 500; padding: 2px 8px; border-radius: 8px; min-width: 0; }
   .hit { padding: 9px 12px; border-radius: 14px; cursor: pointer; font-size: 14px; }
   .hit:hover { background: var(--soft); }
   .hit .m { color: var(--muted); font-size: 12px; }
@@ -74,14 +74,12 @@
   @keyframes pulse { 50% { opacity: .35; } }
 
   /* --- звонок --- */
-  main { overflow-y: auto; min-height: 0; }
-  .card { max-width: 920px; margin: 0 auto; padding: 32px 40px 64px; display: grid; gap: 18px; }
+  main { overflow-y: auto; min-height: 0; min-width: 0; }
+  .card { max-width: 920px; margin: 0 auto; padding: 32px 40px 64px; display: grid; gap: 18px;
+          grid-template-columns: minmax(0, 1fr); }
   .head { display: grid; gap: 14px; }
   .title { min-width: 0; }
   h1 { font-size: 30px; line-height: 1.2; font-weight: 600; margin: 0; letter-spacing: -.025em; }
-  h1 .icon { vertical-align: 5px; margin-left: 4px; opacity: 0; transition: opacity .15s; }
-  .title:hover h1 .icon, h1 .icon:focus-visible { opacity: 1; }
-  .title input { font-size: 26px; font-weight: 600; width: min(640px, 100%); padding: 2px 10px; letter-spacing: -.02em; }
   .chips { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
   video { width: 100%; max-height: 46vh; background: #000; border-radius: 16px; display: block; }
   audio { width: 100%; }
@@ -108,16 +106,17 @@
   .seg.now { background: var(--accent-soft); }
   .seg.now::before { content: ""; position: absolute; left: 4px; top: 12px; bottom: 12px; width: 3px;
                      border-radius: 2px; background: var(--accent); }
-  .seg .time { color: var(--faint); font-size: 13px; cursor: pointer; font-variant-numeric: tabular-nums; }
-  .seg .time:hover { color: var(--accent); }
+  .seg .time { color: var(--muted); font-size: 13px; cursor: pointer; font-variant-numeric: tabular-nums; }
+  .seg .time:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
   .seg .who { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 7px; min-width: 0; }
   .seg .who::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--c); flex: none; }
   .seg .who > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .seg .who .icon { padding: 2px; margin-left: -4px; opacity: 0; }
-  .seg:hover .who .icon, .seg .who .icon:focus { opacity: 1; }
+  .seg .who .icon { padding: 2px; margin-left: -4px; color: var(--faint); }
   .seg .who .icon svg { width: 13px; height: 13px; }
   .seg .who input { width: 100%; padding: 1px 8px; font: inherit; font-weight: 600; border-radius: 8px; }
-  .seg .txt { outline: none; border-radius: 6px; padding: 0 2px; }
+  .seg .txt { outline: none; border-radius: 6px; padding: 0 4px; margin: 0 -4px; cursor: text; transition: background .15s; }
+  .seg .txt:hover { background: var(--soft); }
+  .seg .txt:focus { background: var(--page); }
   .seg .txt:focus { box-shadow: 0 0 0 2px var(--accent-soft); }
   .foot { display: flex; justify-content: space-between; gap: 16px; font-size: 13px; color: var(--muted);
           border-top: 1px solid var(--line); padding-top: 14px; }
@@ -153,14 +152,56 @@
                  border: 1px dashed var(--line); border-radius: 24px; }
   .empty .card.left { text-align: left; border-style: solid; }
   .drop.over { border-color: var(--accent); background: var(--accent-soft); }
-  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--text);
-           color: var(--page); padding: 9px 16px; border-radius: 999px; opacity: 0; transition: opacity .2s;
-           pointer-events: none; font-size: 14px; }
-  .toast.show { opacity: 1; }
+  .toast { position: fixed; right: 28px; bottom: 24px; z-index: 9; background: var(--text); color: var(--page);
+           padding: 10px 16px; border-radius: 16px; opacity: 0; transform: translateY(8px);
+           transition: opacity .2s, transform .2s; pointer-events: none; font-size: 14px; max-width: min(420px, calc(100vw - 32px)); }
+  .toast.show { opacity: 1; transform: none; }
+  #follow:not([hidden]) + .toast { bottom: 76px; }
+  .timer { position: relative; width: 26px; height: 26px; flex: none; display: grid; place-items: center;
+           font-size: 12px; font-variant-numeric: tabular-nums; }
+  .timer svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+  .timer circle { fill: none; stroke: currentColor; stroke-width: 2; opacity: .9; stroke-dasharray: 69.1;
+                  animation: countdown var(--ms) linear forwards; }
+  .timer circle.bg { opacity: .2; animation: none; }
+  @keyframes countdown { to { stroke-dashoffset: 69.1; } }
+  .toast.act { pointer-events: auto; display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 12px; }
+  .toast button { background: rgba(255,255,255,.16); color: inherit; font-weight: 500; padding: 5px 12px; }
+  .toast button:hover { background: rgba(255,255,255,.26); }
+  #follow { position: fixed; right: 28px; bottom: 24px; z-index: 8; }
+
+  /* полоса звонка: прилипает сверху, когда плеер ушёл из вида */
+  .mini { position: sticky; top: 0; height: 0; z-index: 4; }
+  .mini > div { background: var(--page); border-bottom: 1px solid var(--line); opacity: 0; transform: translateY(-6px);
+                pointer-events: none; transition: opacity .15s, transform .15s; }
+  .mini.show > div { opacity: 1; transform: none; pointer-events: auto; }
+  .mini .in { max-width: 920px; margin: 0 auto; padding: 8px 40px; display: flex; align-items: center; gap: 12px;
+              font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .mini .icon { color: var(--text); margin-left: -5px; }
+  .mini .icon svg { width: 18px; height: 18px; }
+  .mini .now-t { color: var(--text); min-width: 40px; }
+  .track { position: relative; flex: 1; height: 24px; cursor: pointer; touch-action: none; outline: none; }
+  .track .lane { position: absolute; left: 0; right: 0; top: 9px; height: 6px; border-radius: 3px; background: var(--soft); overflow: hidden; }
+  .track .lane.played { right: auto; background: none; }
+  .track .lane.played > div { position: absolute; inset: 0 auto 0 0; }
+  .track .blk { position: absolute; top: 0; bottom: 0; background: var(--c); }
+  .track .lane:not(.played) .blk { opacity: .3; }
+  .track .knob { position: absolute; top: 5px; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%;
+                 background: var(--page); border: 2px solid var(--accent); }
+  .track:focus-visible .knob { box-shadow: 0 0 0 3px var(--accent-soft); }
+  .track .hover { position: absolute; top: calc(100% + 6px); transform: translateX(-50%); white-space: nowrap;
+                  background: var(--text); color: var(--page); font-size: 12px; padding: 3px 8px; border-radius: 6px;
+                  pointer-events: none; display: none; }
+  .track:hover .hover, .track.drag .hover { display: block; }
+  .tip { position: relative; display: inline-flex; gap: 6px; }
+  .tip.off button { pointer-events: none; }
+  .tip.off:hover::after { content: attr(data-tip); position: absolute; left: 0; top: calc(100% + 6px); z-index: 6;
+                          background: var(--text); color: var(--page); font-size: 13px; padding: 6px 10px;
+                          border-radius: 8px; white-space: nowrap; }
   @media (max-width: 760px) {
-    .app { grid-template-columns: 1fr; height: auto; }
+    .app { grid-template-columns: minmax(0, 1fr); height: auto; }
     aside { max-height: 40vh; border-right: 0; border-bottom: 1px solid var(--line); }
     .card { padding: 20px 16px 40px; }
+    .mini .in { padding: 8px 16px; }
     h1 { font-size: 24px; }
     .seg { grid-template-columns: 48px 1fr; padding: 9px 10px 9px 14px; }
     .seg .txt { grid-column: 1 / -1; }
@@ -176,7 +217,8 @@
   </aside>
   <main id="main"></main>
 </div>
-<div class="toast" id="toast"></div>
+<button class="ink" id="follow" hidden>К текущей реплике</button>
+<div class="toast" id="toast" role="status"></div>
 
 <script>
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -201,6 +243,7 @@ const svg = path => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
 const PENCIL = svg('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>');
 const DOTS = svg('<circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>');
 const CALENDAR = svg('<rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>');
+const PLAY = svg('<path d="M7 4.5v15l12-7.5Z" fill="currentColor"/>'), PAUSE = svg('<path d="M8 5v14M16 5v14" stroke-width="3"/>');
 const CLOCK = svg('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>');
 const pill = (html, text, attrs = {}) => { const p = h('span', { class: 'pill', ...attrs }); p.innerHTML = html; p.append(text); return p; };
 const icon = (html, title, onclick) => {
@@ -221,30 +264,41 @@ async function api(path, opts = {}) {
   }
   return res.json();
 }
-function toast(text) {
-  const t = $('#toast'); t.textContent = text; t.classList.add('show');
-  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2200);
+function toast(text, { action, onAction, ms = 2200, countdown = false } = {}) {
+  const t = $('#toast');
+  clearTimeout(t._h); clearInterval(t._tick);
+  const hide = () => { t.classList.remove('show', 'act'); clearInterval(t._tick); };
+  t.replaceChildren();
+  if (countdown) {  // кольцо и секунды до окончательного действия
+    const num = h('span', {}, String(Math.ceil(ms / 1000)));
+    const ring = h('span', { class: 'timer', style: `--ms:${ms}ms`,
+      html: '<svg viewBox="0 0 26 26"><circle class="bg" cx="13" cy="13" r="11"/><circle cx="13" cy="13" r="11"/></svg>' }, num);
+    const end = Date.now() + ms;
+    t._tick = setInterval(() => { num.textContent = String(Math.max(0, Math.ceil((end - Date.now()) / 1000))); }, 200);
+    t.append(ring);
+  }
+  t.append(h('span', {}, text));
+  if (action) t.append(h('button', { onclick: () => { hide(); onAction(); } }, action));
+  t.classList.toggle('act', !!action);
+  void t.offsetWidth;  // перезапуск анимации кольца
+  t.classList.add('show');
+  t._h = setTimeout(hide, ms);
 }
 
-const state = { calls: [], current: null, call: null, pending: null };
+const state = { calls: [], current: null, call: null, pending: null, deleting: new Map(), follow: true, eta: null };
 
 // --- список ---
 async function loadList() {
   state.calls = await api('/api/calls');
-  if ($('#q').value.trim() || $('#list .kebab.open')) return;  // не закрывать открытое меню
+  if ($('#q').value.trim() || $('#list .kebab.open') || $('#list input')) return;  // не мешать меню и переименованию
   renderList();
 }
 function callMenu(c) {
-  let confirmDelete = false;
-  const del = h('button', { class: 'danger', onclick: async e => {
-    e.stopPropagation();
-    if (!confirmDelete) { confirmDelete = true; del.textContent = 'Точно удалить?';
-      setTimeout(() => { confirmDelete = false; del.textContent = 'Удалить'; }, 3000); return; }
-    kebab.classList.remove('open');
-    await api('/api/calls/' + c.id, { method: 'DELETE' });
-    toast('Расшифровка удалена. Сама запись не тронута.');
-    if (c.id === state.current) showEmpty();
-    await loadList();
+  const ren = h('button', { onclick: e => {
+    e.stopPropagation(); kebab.classList.remove('open'); renameCall(c, kebab.closest('.item'));
+  } }, 'Переименовать');
+  const del = h('button', { class: 'danger', onclick: e => {
+    e.stopPropagation(); kebab.classList.remove('open'); deleteCall(c);
   } }, 'Удалить');
   const kebab = h('div', { class: 'kebab', onclick: e => e.stopPropagation() },
     icon(DOTS, 'Ещё', () => {
@@ -252,14 +306,34 @@ function callMenu(c) {
       document.querySelectorAll('.kebab.open').forEach(k => k.classList.remove('open'));
       kebab.classList.toggle('open', open);
     }),
-    h('div', { class: 'menu' }, del));
+    h('div', { class: 'menu' }, ren, del));
   return kebab;
 }
+// удаляем через 7 секунд, а до этого можно вернуть
+function deleteCall(c) {
+  const wasOpen = c.id === state.current;
+  const timer = setTimeout(async () => {
+    state.deleting.delete(c.id);
+    await api('/api/calls/' + c.id, { method: 'DELETE' }).catch(e => toast(e.message));
+    loadList();
+  }, 7000);
+  state.deleting.set(c.id, timer);
+  if (wasOpen) showEmpty(); else renderList();
+  toast('Расшифровка удалена. Сама запись не тронута.', { action: 'Вернуть', ms: 7000, countdown: true, onAction: () => {
+    clearTimeout(timer); state.deleting.delete(c.id);
+    if (wasOpen) openCall(c.id); else renderList();
+  } });
+}
+window.addEventListener('pagehide', () => {  // страницу закрыли раньше — удаляем сразу
+  for (const id of state.deleting.keys()) fetch('/api/calls/' + id, { method: 'DELETE', keepalive: true });
+});
+
 function renderList() {
   const list = $('#list'); list.replaceChildren();
-  if (!state.calls.length) { list.append(h('div', { class: 'muted', style: 'padding:12px' }, 'Пока нет звонков.')); return; }
-  for (const c of state.calls) {
-    let meta = `${date(c.recorded_at)} · ${dur(c.duration || 0)}`;
+  const calls = state.calls.filter(c => !state.deleting.has(c.id));
+  if (!calls.length) { list.append(h('div', { class: 'muted', style: 'padding:12px' }, 'Пока нет звонков.')); return; }
+  for (const c of calls) {
+    let meta = dur(c.duration || 0);
     if (c.status === 'running') meta = `${c.stage || 'Расшифровка'} · ${Math.round(c.progress * 100)}%`;
     else if (c.status !== 'done') meta = `${STATUS[c.status]} · ${meta}`;
     list.append(h('div', { class: 'item' + (c.id === state.current ? ' active' : ''), onclick: () => openCall(c.id) },
@@ -291,7 +365,7 @@ $('#q').addEventListener('input', () => {
     const hits = await api('/api/search?q=' + encodeURIComponent(q));
     const list = $('#list'); list.replaceChildren();
     if (!hits.length) list.append(h('div', { class: 'muted', style: 'padding:12px' }, 'Ничего не найдено.'));
-    for (const r of hits) {
+    for (const r of hits.filter(r => !state.deleting.has(r.call_id))) {
       const i = r.text.toLowerCase().indexOf(q.toLowerCase());
       const from = Math.max(0, i - 40);
       const text = h('div', {}, (from ? '…' : '') + r.text.slice(from, i), h('mark', {}, r.text.slice(i, i + q.length)),
@@ -390,20 +464,19 @@ function renderCall(call) {
         catch (e) { if (e.message !== 'Файл не выбран.') toast(e.message); }
       } }, 'Указать, где она теперь')));
   }
-  const tools = h('div', { class: 'tools' },
+  const tools = h('div', { class: 'tools' }, h('span', { class: 'tip', id: 'out' },
     h('button', { class: 'btn', onclick: copyAll }, 'Скопировать'),
-    downloadMenu(call));
+    downloadMenu(call)));
   if (call.media_exists) {
     player = h('div', { class: 'vwrap', id: 'vwrap' },
       h(call.has_video ? 'video' : 'audio', { id: 'media', src: `/api/calls/${call.id}/media`, controls: true, preload: 'metadata' }));
   }
 
-  $('#main').replaceChildren(h('div', { class: 'card' },
+  $('#main').replaceChildren(call.media_exists ? miniBar() : '', h('div', { class: 'card' },
     h('div', { class: 'head' },
       h('div', { class: 'title', id: 'title' }, titleView(call)),
       h('div', { class: 'bar' }, tools,
         h('div', { class: 'chips' },
-          h('span', { class: 'pill', id: 'state' }),
           pill(CALENDAR, date(call.recorded_at)),
           pill(CLOCK, dur(call.duration || 0))))),
     h('div', { id: 'status' }),
@@ -412,7 +485,15 @@ function renderCall(call) {
     h('div', { class: 'foot' }, h('span', { id: 'foot' }), h('span', { class: 'path', title: call.path }, '‎' + call.path))));
 
   const m = $('#media');
-  if (m) m.addEventListener('timeupdate', highlight);
+  if (m) {
+    m.addEventListener('timeupdate', highlight);
+    m.addEventListener('play', () => { state.follow = true; followButton(); });
+    m.addEventListener('pause', followButton);
+    for (const ev of ['timeupdate', 'play', 'pause', 'loadedmetadata']) m.addEventListener(ev, () => drawMini());
+    // полосу показываем, только когда плеер прокручен выше верха окна
+    new IntersectionObserver(([e]) => $('#mini').classList.toggle('show', !e.isIntersecting && e.boundingClientRect.top < e.rootBounds.top),
+      { root: $('main') }).observe(m);
+  }
   updateCall(call);
 }
 
@@ -430,18 +511,31 @@ function downloadMenu(call) {
   return box;
 }
 
+// оставшееся время — по скорости с момента, как мы начали следить за этой расшифровкой
+function eta(call) {
+  const now = Date.now() / 1000, e = state.eta;
+  if (!e || e.id !== call.id || call.progress < e.p) { state.eta = { id: call.id, t: now, p: call.progress }; return ''; }
+  const done = call.progress - e.p, spent = now - e.t;
+  if (spent < 8 || done < 0.02) return '';
+  const left = spent / done * (1 - call.progress);
+  return left < 60 ? 'осталось меньше минуты' : `осталось ≈ ${Math.round(left / 60)} мин`;
+}
+
 function updateCall(call) {
-  const stateEl = $('#state');
-  stateEl.hidden = call.status === 'done';
-  stateEl.replaceChildren(h('span', { class: 'dot ' + call.status }), STATUS[call.status]);
-  $('#foot').textContent = call.status === 'running' ? `${(call.stage || 'расшифровка').toLowerCase()} · ${Math.round(call.progress * 100)}%`
-    : `${STATUS[call.status]} · ${plural(call.segments.length, 'реплика', 'реплики', 'реплик')}`;
+  const ready = call.status === 'done';
+  const out = $('#out');
+  out.classList.toggle('off', !ready);
+  out.dataset.tip = call.status === 'queued' || call.status === 'running'
+    ? 'Станет доступно, когда расшифровка закончится' : 'Расшифровка не завершена — нажмите «Повторить»';
+  out.querySelectorAll('button').forEach(b => { b.disabled = !ready; });
+  $('#foot').textContent = ready ? plural(call.segments.length, 'реплика', 'реплики', 'реплик') : '';
 
   const st = $('#status'); st.replaceChildren();
   if (call.status === 'queued' || call.status === 'running') {
     st.append(h('div', { class: 'banner' },
       h('div', { class: 'row', style: 'justify-content:space-between' },
-        h('span', {}, call.status === 'queued' ? 'В очереди…' : `${call.stage || 'Расшифровка'} · ${Math.round(call.progress * 100)}%`),
+        h('span', {}, call.status === 'queued' ? 'В очереди…'
+          : [call.stage || 'Расшифровка', `${Math.round(call.progress * 100)}%`, eta(call)].filter(Boolean).join(' · ')),
         h('button', { class: 'btn', onclick: async () => { await api(`/api/calls/${call.id}/cancel`, { method: 'POST' }); openCall(call.id); } }, 'Отменить')),
       h('div', { class: 'progress' }, h('div', { style: `width:${Math.round(call.progress * 100)}%` }))));
   } else if (call.status === 'error' || call.status === 'cancelled') {
@@ -458,7 +552,10 @@ function updateCall(call) {
   segs.replaceChildren(...call.segments.map(s => {
     const who = nm[s.speaker];
     const txt = h('div', { class: 'txt', contenteditable: 'plaintext-only', spellcheck: 'false' }, s.text);
-    txt.addEventListener('focus', () => { txt.textContent = txt.textContent; });  // без подсветки поиска при правке
+    txt.addEventListener('focus', () => {
+      txt.textContent = txt.textContent;  // без подсветки поиска при правке
+      editHint();
+    });
     txt.addEventListener('blur', async () => {
       const text = txt.textContent.trim();
       if (text === s.text) return;
@@ -478,6 +575,59 @@ function updateCall(call) {
     call.status === 'done' ? 'В записи не нашлось речи.' : 'Реплики появятся по мере расшифровки.'));
   applyFind(false);
   highlight();
+  trackBlocks();
+}
+
+// --- полоса звонка ---
+const mediaDur = () => { const m = $('#media'); return (m && isFinite(m.duration) && m.duration) || state.call.duration || 1; };
+function miniBar() {
+  const track = h('div', { class: 'track', id: 'track', tabindex: 0, role: 'slider', 'aria-label': 'Перемотка' },
+    h('div', { class: 'lane', id: 'lane' }), h('div', { class: 'lane played', id: 'played' }, h('div', { id: 'played-in' })),
+    h('div', { class: 'knob', id: 'knob' }), h('div', { class: 'hover', id: 'hover' }));
+  const at = e => { const r = track.getBoundingClientRect(); return Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) * mediaDur(); };
+  const tip = e => {  // время и кто говорит в этой точке
+    const t = at(e), s = state.call.segments.find(s => t >= s.start && t < s.end), who = s && names()[s.speaker];
+    const hv = $('#hover');
+    hv.textContent = fmt(t) + (who ? ' · ' + who.name : '');
+    hv.style.left = (t / mediaDur() * 100) + '%';
+    return t;
+  };
+  track.addEventListener('pointermove', e => { const t = tip(e); if (track.classList.contains('drag')) jump(t); });
+  track.addEventListener('pointerdown', e => { track.setPointerCapture(e.pointerId); track.classList.add('drag'); jump(tip(e)); });
+  track.addEventListener('pointerup', () => track.classList.remove('drag'));
+  track.addEventListener('lostpointercapture', () => track.classList.remove('drag'));
+  const jump = t => {
+    const m = $('#media'); m.currentTime = t; state.follow = true; drawMini(); highlight(true);
+    if (!lastNow) {  // попали в паузу между репликами — показываем ближайшую
+      const segs = [...document.querySelectorAll('.seg')];
+      const near = segs.find(el => +el.dataset.start > t) || segs[segs.length - 1];
+      if (near) near.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  };
+  return h('div', { class: 'mini', id: 'mini' }, h('div', {}, h('div', { class: 'in' },
+    icon(PLAY, 'Пуск / пауза (пробел)', () => { const m = $('#media'); m.paused ? m.play() : m.pause(); }),
+    h('span', { class: 'now-t', id: 'mini-t' }, '00:00'), track, h('span', { id: 'mini-d' }, fmt(state.call.duration || 0)))));
+}
+function trackBlocks() {
+  const lane = $('#lane'), played = $('#played-in');
+  if (!lane) return;
+  const d = mediaDur(), nm = names();
+  const blocks = () => state.call.segments.map(s => h('div', { class: 'blk', style:
+    `left:${s.start / d * 100}%;width:${Math.max(0.15, (s.end - s.start) / d * 100)}%;--c:${color(nm[s.speaker] ? nm[s.speaker].idx : 0)}` }));
+  lane.replaceChildren(...blocks()); played.replaceChildren(...blocks());
+  drawMini();
+}
+function drawMini() {
+  const m = $('#media');
+  if (!m || !$('#mini')) return;
+  const d = mediaDur(), p = Math.min(100, m.currentTime / d * 100);
+  $('#knob').style.left = p + '%';
+  $('#played').style.width = p + '%';
+  $('#played-in').style.width = p ? (100 / p * 100) + '%' : '0';  // блоки внутри — во всю ширину дорожки
+  $('#mini-t').textContent = fmt(m.currentTime);
+  $('#mini-d').textContent = fmt(d);
+  $('#track').setAttribute('aria-valuetext', fmt(m.currentTime));
+  $('#mini .icon').innerHTML = m.paused ? PLAY : PAUSE;
 }
 
 function applyFind(jump) {
@@ -517,6 +667,11 @@ function showFind(scroll) {
   }
 }
 
+function editHint() {  // один раз на браузер
+  try { if (localStorage.getItem('editHint')) return; localStorage.setItem('editHint', '1'); } catch {}
+  toast('Правка текста: Enter — сохранить, Esc — отменить', { ms: 4500 });
+}
+
 function whoCell(s, label) {
   const cell = h('div', { class: 'who' }, h('span', {}, s ? s.name : label));
   if (s) cell.append(icon(PENCIL, 'Переименовать собеседника во всех репликах', () => renameSpeaker(cell, s)));
@@ -543,27 +698,25 @@ function renameSpeaker(cell, s) {
   input.addEventListener('blur', () => save(true));
 }
 
-function titleView(call) {  // карандаш переносится вместе с последним словом
-  const i = call.title.lastIndexOf(' ') + 1;
-  return h('h1', {}, call.title.slice(0, i), h('span', { style: 'white-space:nowrap' }, call.title.slice(i),
-    icon(PENCIL, 'Переименовать встречу', () => renameTitle(call))));
-}
+function titleView(call) { return h('h1', {}, call.title); }
 
-function renameTitle(call) {
-  const box = $('#title');
-  if (box.querySelector('input')) return;
-  const input = h('input', { value: call.title });
-  box.replaceChildren(input);
+// переименование — из меню карточки, поле прямо на месте названия
+function renameCall(c, item) {
+  const t = item.querySelector('.t');
+  const input = h('input', { value: c.title, onclick: e => e.stopPropagation() });
+  t.replaceWith(input);
   input.focus(); input.select();
   let done = false;
   const save = async ok => {
     if (done) return; done = true;
     const name = input.value.trim();
-    if (ok && name && name !== call.title) {
-      try { await api('/api/calls/' + call.id, { method: 'PATCH', body: { name } }); call.title = name; loadList(); }
-      catch (e) { toast(e.message); }
+    if (ok && name && name !== c.title) {
+      try {
+        await api('/api/calls/' + c.id, { method: 'PATCH', body: { name } }); c.title = name;
+        if (state.call && state.call.id === c.id) { state.call.title = name; $('#title').replaceChildren(titleView(state.call)); }
+      } catch (e) { toast(e.message); }
     }
-    box.replaceChildren(titleView(call));
+    input.remove(); renderList();
   };
   input.addEventListener('keydown', e => { if (e.key === 'Enter') save(true); if (e.key === 'Escape') save(false); });
   input.addEventListener('blur', () => save(true));
@@ -572,6 +725,7 @@ function renameTitle(call) {
 function seek(t, play) {
   const m = $('#media');
   if (!m) return;
+  state.follow = true;
   m.currentTime = t;
   if (play) m.play().catch(() => {});
   highlight(true);
@@ -586,11 +740,26 @@ function highlight(scroll) {
   for (const el of document.querySelectorAll('.seg')) {
     if (t >= +el.dataset.start && t < +el.dataset.end + 0.3) { now = el; break; }
   }
+  followButton();
   if (now === lastNow && scroll !== true) return;
   if (lastNow) lastNow.classList.remove('now');
-  if (now) { now.classList.add('now'); if (scroll === true || !m.paused) now.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+  if (now) { now.classList.add('now'); if (scroll === true || (!m.paused && state.follow)) now.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
   lastNow = now;
+  followButton();
 }
+
+// прокрутили сами, пока играет видео, — перестаём тянуть текст к текущей реплике
+function stopFollow() {
+  const m = $('#media');
+  if (m && !m.paused && state.follow) { state.follow = false; followButton(); }
+}
+function followButton() {
+  const m = $('#media');
+  $('#follow').hidden = state.follow || !m || m.paused || !lastNow;
+}
+$('main').addEventListener('wheel', stopFollow, { passive: true });
+$('main').addEventListener('touchmove', stopFollow, { passive: true });
+$('#follow').addEventListener('click', () => { state.follow = true; highlight(true); followButton(); });
 
 async function copyAll() {
   const nm = names();
@@ -604,6 +773,7 @@ document.addEventListener('keydown', e => {
   if ((e.metaKey || e.ctrlKey) && e.code === 'KeyF' ) { e.preventDefault(); $('#q').focus(); $('#q').select(); return; }
   const tag = document.activeElement && document.activeElement.tagName;
   if (tag === 'INPUT' || tag === 'SELECT' || (document.activeElement && document.activeElement.isContentEditable)) return;
+  if (['PageDown', 'PageUp', 'Home', 'End'].includes(e.key)) stopFollow();
   const m = $('#media');
   if (!m) return;
   if (e.code === 'Space') { e.preventDefault(); m.paused ? m.play() : m.pause(); }

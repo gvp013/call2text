@@ -2,6 +2,7 @@
 
 import os
 import queue
+import re
 import sqlite3
 import subprocess
 import sys
@@ -10,6 +11,7 @@ import threading
 import time
 import webbrowser
 from contextlib import closing
+from datetime import datetime
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -79,11 +81,33 @@ def init_db():
                 text TEXT NOT NULL
             );
         """)
+        # старые записи с названием-именем файла — на понятное название
+        for row in conn.execute("SELECT id, title, path FROM calls").fetchall():
+            if row["title"] == Path(row["path"]).stem:
+                title, started = nice_title(row["path"])
+                if title != row["title"]:
+                    conn.execute("UPDATE calls SET title=?, recorded_at=COALESCE(?, recorded_at) WHERE id=?",
+                                 (title, started, row["id"]))
         # после перезапуска незаконченные задачи снова в очередь
         conn.execute("UPDATE calls SET status='queued', stage=NULL, progress=0 "
                      "WHERE status IN ('queued', 'running')")
         for row in conn.execute("SELECT id FROM calls WHERE status='queued' ORDER BY id"):
             jobs.put(row["id"])
+
+
+MONTHS = "янв фев мар апр мая июн июл авг сен окт ноя дек".split()
+TELEMOST = re.compile(r"Telemost (\d{2})\.(\d{2})\.(\d{2}) (\d{2})-(\d{2})-(\d{2})")
+
+
+def nice_title(path: str):
+    """Название для списка и время начала звонка. Для записей Телемоста — «Телемост · 15 окт, 10:30»."""
+    stem = Path(path).stem
+    m = TELEMOST.search(stem)
+    if not m:
+        return stem, os.path.getmtime(path) if os.path.exists(path) else None
+    d, mo, y, hh, mm, ss = map(int, m.groups())
+    started = datetime(2000 + y, mo, d, hh, mm, ss)
+    return f"Телемост · {d} {MONTHS[mo - 1]}, {hh:02d}:{mm:02d}", started.timestamp()
 
 
 def set_status(call_id, **fields):
@@ -101,6 +125,17 @@ def get_models():
     return models["pipeline"], models["model"]
 
 
+# доли этапов pyannote в общей полосе: разметка занимает 5–65%, распознавание — 65–100%
+STEPS = {"segmentation": (0.05, 0.2), "embeddings": (0.2, 0.65)}
+
+
+def models_cached() -> bool:
+    from huggingface_hub import constants
+    hub = Path(constants.HF_HUB_CACHE)
+    return all((hub / f"models--{name}").is_dir() for name in
+               ("ai-sage--GigaAM-v3", "pyannote--speaker-diarization-community-1", "pyannote--segmentation-3.0"))
+
+
 def process(call_id):
     with closing(db()) as conn:
         call = conn.execute("SELECT * FROM calls WHERE id=?", (call_id,)).fetchone()
@@ -111,20 +146,22 @@ def process(call_id):
         if call_id in cancelled:
             raise Cancelled()
 
-    set_status(call_id, status="running", stage="Загрузка моделей", progress=0, error=None)
+    stage = "Загрузка моделей" if models_cached() else "Первый запуск: скачиваю модели (~1,5 ГБ)"
+    set_status(call_id, status="running", stage=stage, progress=0, error=None)
     pipeline, model = get_models()
     check()
 
-    set_status(call_id, stage="Чтение записи", progress=0)
+    set_status(call_id, stage="Чтение записи", progress=0.03)
     wav = c.load_audio(call["path"])
     check()
 
     def hook(step, artifact, file=None, total=None, completed=None):
         check()
-        if total:
-            set_status(call_id, stage="Разметка собеседников", progress=completed / total)
+        if total and step in STEPS:
+            lo, hi = STEPS[step]
+            set_status(call_id, stage="Разметка собеседников", progress=lo + (hi - lo) * completed / total)
 
-    set_status(call_id, stage="Разметка собеседников", progress=0)
+    set_status(call_id, stage="Разметка собеседников", progress=0.05)
     turns = c.diarize(wav, call["speakers"], pipeline=pipeline, hook=hook)
     if call["merge"]:
         turns = c.merge_turns(turns)
@@ -140,7 +177,7 @@ def process(call_id):
         for i, (start, end, label) in enumerate(turns):
             check()
             set_status(call_id, stage=f"Распознавание: {i + 1} из {len(turns)}",
-                       progress=i / len(turns))
+                       progress=0.65 + 0.35 * i / len(turns))
             text = c.transcribe_turn(model, wav, start, end, chunk_path)
             if not text:
                 continue
@@ -267,11 +304,12 @@ def create_call(body: NewCall):
     if not os.path.isfile(path):
         raise HTTPException(400, "Файл не найден.")
     duration = probe(path)
+    title, started = nice_title(path)
     with closing(db()) as conn, conn:
         cur = conn.execute(
             "INSERT INTO calls (title, path, duration, recorded_at, created_at, speakers, merge, status) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, 'queued')",
-            (Path(path).stem, path, duration, os.path.getmtime(path), time.time(),
+            (title, path, duration, started, time.time(),
              body.speakers, int(body.merge)))
         call_id = cur.lastrowid
     jobs.put(call_id)
