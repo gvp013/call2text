@@ -20,6 +20,7 @@ from pydantic import BaseModel
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import call2text as c  # noqa: E402
+import numpy as np  # noqa: E402
 
 HOST, PORT = "127.0.0.1", 8790
 WINDOWS = sys.platform == "win32"
@@ -265,6 +266,7 @@ class NewCall(BaseModel):
     path: str
     speakers: int | None = None
     merge: bool = True
+    title: str | None = None  # своё название; пусто — как из имени файла
 
 
 class Rename(BaseModel):
@@ -286,16 +288,36 @@ def index():
 
 @app.post("/api/pick")
 def pick():
-    path = choose_file("Выберите запись звонка")
-    return {"path": path, "name": Path(path).name, "duration": probe(path)}
+    return file_info(choose_file("Выберите запись звонка"))
 
 
-@app.post("/api/probe")
-def probe_path(body: Relink):
-    path = os.path.expanduser((body.path or "").strip().strip("'\""))
+def file_info(path: str) -> dict:
+    return {"path": path, "name": Path(path).name, "duration": probe(path), "has_video": has_video(path),
+            "title": nice_title(path)[0]}
+
+
+@app.get("/api/peaks")
+def peaks(path: str, n: int = 160):
+    """Громкость по кусочкам — волна аудиозаписи в окне добавления."""
     if not os.path.isfile(path):
-        raise HTTPException(400, "Файл не найден.")
-    return {"path": path, "name": Path(path).name, "duration": probe(path)}
+        raise HTTPException(404, "Файл не найден.")
+    out = subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-i", path, "-vn", "-ac", "1", "-ar", "8000",
+                          "-f", "s16le", "-"], capture_output=True)
+    wav = np.abs(np.frombuffer(out.stdout, np.int16).astype(np.float32))
+    if not len(wav):
+        raise HTTPException(404, "В записи нет звука.")
+    parts = np.array_split(wav, n)
+    level = np.array([p.max() if len(p) else 0 for p in parts])
+    return (level.astype(float) / (level.max() or 1)).round(3).tolist()
+
+
+@app.get("/api/file")
+def local_file(path: str):
+    """Сам файл — послушать аудио перед расшифровкой."""
+    if not os.path.isfile(path):
+        raise HTTPException(404, "Файл не найден.")
+    return FileResponse(path)
+
 
 
 @app.post("/api/calls")
@@ -305,6 +327,7 @@ def create_call(body: NewCall):
         raise HTTPException(400, "Файл не найден.")
     duration = probe(path)
     title, started = nice_title(path)
+    title = (body.title or "").strip() or title
     with closing(db()) as conn, conn:
         cur = conn.execute(
             "INSERT INTO calls (title, path, duration, recorded_at, created_at, speakers, merge, status) "

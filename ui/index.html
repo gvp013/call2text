@@ -36,7 +36,8 @@
   button.danger { color: var(--danger); }
   input, select { font: inherit; color: inherit; background: var(--page); border: 1px solid var(--line);
                   border-radius: 12px; padding: 8px 12px; outline: none; }
-  input:focus, select:focus { border-color: var(--accent); }
+  /* рамка в фокусе — 1,5px: своя 1px + внутренняя тень 0,5px, без сдвига вёрстки */
+  input:focus, select:focus { border-color: var(--accent); box-shadow: inset 0 0 0 .5px var(--accent); }
   select { appearance: none; -webkit-appearance: none; padding-right: 36px; cursor: pointer;
            background: var(--page) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2377777f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center / 16px; }
   input[type=checkbox] { accent-color: var(--accent); }
@@ -81,7 +82,7 @@
   .title { min-width: 0; }
   h1 { font-size: 30px; line-height: 1.2; font-weight: 600; margin: 0; letter-spacing: -.025em; }
   .chips { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
-  video { width: 100%; max-height: 46vh; background: #000; border-radius: 16px; display: block; }
+  video { width: 100%; max-height: 46vh; background: #000; border-radius: 24px; display: block; }
   audio { width: 100%; }
   .bar { display: flex; gap: 8px 16px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
   .tools { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
@@ -89,7 +90,8 @@
 
   .find { display: flex; align-items: center; gap: 2px; border: 1px solid var(--line); border-radius: 999px;
           padding: 2px 4px 2px 12px; flex: 1; min-width: 200px; max-width: 360px; }
-  .find:focus-within { border-color: var(--accent); }
+  .find:focus-within { border-color: var(--accent); box-shadow: inset 0 0 0 .5px var(--accent); }
+  .find input:focus { box-shadow: none; }
   .find > svg { width: 16px; height: 16px; color: var(--muted); flex: none; }
   .find input, aside .find input { border: 0; padding: 6px 4px; flex: 1; min-width: 0; background: none; }
   .find .n { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; padding: 0 4px; }
@@ -148,9 +150,22 @@
 
   /* --- пустое состояние и настройка --- */
   .empty { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
-  .empty .card { max-width: 480px; width: 100%; text-align: center; gap: 14px; padding: 40px;
-                 border: 1px dashed var(--line); border-radius: 24px; }
-  .empty .card.left { text-align: left; border-style: solid; }
+  .empty .card { max-width: 480px; width: 100%; text-align: center; gap: 14px; padding: 40px; border-radius: 24px; }
+  .empty .card.left { text-align: left; }
+  .empty .card.wide { max-width: 680px; }
+  video.pv { max-height: 52vh; }
+  .form { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px 14px; align-items: center; }
+  .form select { justify-self: start; }
+  .wave { background: var(--soft); border-radius: 24px; padding: 20px; display: grid; gap: 12px; }
+  .wave .bars { height: 96px; display: flex; align-items: center; gap: 3px; cursor: pointer; }
+  .wave .bars span { flex: 1; min-height: 4px; border-radius: 3px; background: var(--faint); }
+  .wave .bars span.on { background: var(--accent); }
+  .wave .ctl { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted);
+               font-variant-numeric: tabular-nums; }
+  .wave .ctl .btn { display: inline-grid; place-items: center; padding: 8px; background: var(--page); }
+  .wave .ctl .btn svg { width: 18px; height: 18px; }
+  .wave .ctl .cur { color: var(--text); }
+  .wave .ctl .end { margin-left: auto; }
   .drop.over { border-color: var(--accent); background: var(--accent-soft); }
   .toast { position: fixed; right: 28px; bottom: 24px; z-index: 9; background: var(--text); color: var(--page);
            padding: 10px 16px; border-radius: 16px; opacity: 0; transform: translateY(8px);
@@ -309,17 +324,17 @@ function callMenu(c) {
     h('div', { class: 'menu' }, ren, del));
   return kebab;
 }
-// удаляем через 7 секунд, а до этого можно вернуть
+// удаляем через 15 секунд, а до этого можно вернуть
 function deleteCall(c) {
   const wasOpen = c.id === state.current;
   const timer = setTimeout(async () => {
     state.deleting.delete(c.id);
     await api('/api/calls/' + c.id, { method: 'DELETE' }).catch(e => toast(e.message));
     loadList();
-  }, 7000);
+  }, 15000);
   state.deleting.set(c.id, timer);
   if (wasOpen) showEmpty(); else renderList();
-  toast('Расшифровка удалена. Сама запись не тронута.', { action: 'Вернуть', ms: 7000, countdown: true, onAction: () => {
+  toast('Расшифровка удалена. Сама запись не тронута.', { action: 'Вернуть', ms: 15000, countdown: true, onAction: () => {
     clearTimeout(timer); state.deleting.delete(c.id);
     if (wasOpen) openCall(c.id); else renderList();
   } });
@@ -382,59 +397,96 @@ async function pickFile() {
   try { showSetup(await api('/api/pick', { method: 'POST' })); }
   catch (e) { if (e.message !== 'Файл не выбран.') toast(e.message); }
 }
-async function usePath(path) {
-  try { showSetup(await api('/api/probe', { method: 'POST', body: { path } })); }
-  catch (e) { toast(e.message); }
-}
 
 function showEmpty() {
+  stopPreview();
   state.current = null; state.call = null; renderList();
   const drop = h('div', { class: 'card drop' },
     h('div', { style: 'font-size:18px;font-weight:700' }, 'Новая расшифровка'),
     h('div', { class: 'muted', style: 'font-size:13px' }, '.webm · .mp4 · .mov · .m4a · .mp3 · .ogg · .wav'),
-    h('div', {}, h('button', { class: 'ink', onclick: pickFile }, 'Выбрать файл…')),
-    h('div', { class: 'muted' }, 'или путь к файлу'),
-    h('div', { class: 'row', style: 'justify-content:center' },
-      h('input', { id: 'path', placeholder: '/Users/…/recording.webm', style: 'width:300px;font-size:13px',
-        onkeydown: e => e.key === 'Enter' && usePath(e.target.value) }),
-      h('button', { class: 'btn', onclick: () => usePath($('#path').value) }, 'Открыть')));
+    h('div', {}, h('button', { class: 'ink', onclick: pickFile }, 'Выбрать файл…')));
   drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
   drop.addEventListener('dragleave', () => drop.classList.remove('over'));
   drop.addEventListener('drop', e => {
     e.preventDefault(); drop.classList.remove('over');
-    toast('Браузер не сообщает, где лежит файл. Нажмите «Выбрать файл…» или вставьте путь.');
+    toast('Браузер не сообщает, где лежит файл. Нажмите «Выбрать файл…».');
   });
   $('#main').replaceChildren(h('div', { class: 'empty' }, drop));
 }
 
 function showSetup(file) {
+  stopPreview();
   state.pending = file;
   const sp = h('select', { id: 'speakers' },
     h('option', { value: '' }, 'автоматически'),
     [1, 2, 3, 4, 5, 6].map(n => h('option', { value: n, selected: n === 2 }, String(n))));
-  const merge = h('input', { type: 'checkbox', id: 'merge', checked: true });
-  $('#main').replaceChildren(h('div', { class: 'empty' }, h('div', { class: 'card left' },
-    h('div', {}, h('div', { style: 'font-weight:700;font-size:16px;overflow-wrap:anywhere' }, file.name),
-      h('div', { class: 'muted', style: 'font-size:13px' }, dur(file.duration))),
+  const start = async () => {
+    go.disabled = true;
+    try {
+      const { id } = await api('/api/calls', { method: 'POST',
+        body: { path: file.path, speakers: sp.value ? Number(sp.value) : null, title: title.value } });
+      await loadList(); openCall(id);
+    } catch (err) { toast(err.message); go.disabled = false; }
+  };
+  const title = h('input', { id: 'new-title', value: file.title || '', placeholder: file.name,
+    onkeydown: e => e.key === 'Enter' && start() });
+  const go = h('button', { class: 'ink', onclick: start }, 'Расшифровать');
+  $('#main').replaceChildren(h('div', { class: 'empty' }, h('div', { class: 'card left wide' },
+    file.has_video ? preview(file) : wave(file),
+    h('div', { class: 'muted', style: 'font-size:13px;overflow-wrap:anywhere' }, `${file.name} · ${dur(file.duration)}`),
     file.duration > 7200 ? h('div', { class: 'banner' }, 'Запись длиннее 2 часов — расшифровка займёт заметно больше времени и памяти.') : null,
-    h('label', { class: 'row' }, 'Число собеседников:', sp),
-    h('label', { class: 'row' }, merge, 'Склеивать соседние реплики одного человека'),
-    h('div', { class: 'row' },
-      h('button', { class: 'ink', onclick: async e => {
-        e.currentTarget.disabled = true;
-        const btn = e.currentTarget;
-        try {
-          const { id } = await api('/api/calls', { method: 'POST',
-            body: { path: file.path, speakers: sp.value ? Number(sp.value) : null, merge: merge.checked } });
-          await loadList(); openCall(id);
-        } catch (err) { toast(err.message); btn.disabled = false; }
-      } }, 'Расшифровать'),
+    h('div', { class: 'form' },
+      h('label', { for: 'new-title' }, 'Название'), title,
+      h('label', { for: 'speakers' }, 'Число собеседников'), sp),
+    h('div', { class: 'row' }, go,
       h('button', { class: 'btn', onclick: showEmpty }, 'Отменить')))));
+}
+
+// волна аудиозаписи: нажать на любое место и послушать, сколько там голосов
+function wave(file) {
+  const audio = h('audio', { src: `/api/file?path=${encodeURIComponent(file.path)}`, preload: 'metadata' });
+  state.preview = audio;
+  const bars = h('div', { class: 'bars', title: 'Послушать с этого места' });
+  const cur = h('span', { class: 'cur' }, '00:00');
+  const play = h('button', { class: 'btn', 'aria-label': 'Пуск / пауза', onclick: () => audio.paused ? audio.play() : audio.pause() });
+  const draw = () => {
+    const p = audio.currentTime / (audio.duration || file.duration);
+    [...bars.children].forEach((b, i, all) => b.classList.toggle('on', i / all.length < p));
+    cur.textContent = fmt(audio.currentTime);
+    play.innerHTML = audio.paused ? PLAY : PAUSE;
+  };
+  for (const ev of ['timeupdate', 'play', 'pause']) audio.addEventListener(ev, draw);
+  bars.addEventListener('click', e => {
+    const r = bars.getBoundingClientRect();
+    audio.currentTime = (e.clientX - r.left) / r.width * (audio.duration || file.duration);
+    audio.play();
+  });
+  const box = h('div', { class: 'wave' }, bars,
+    h('div', { class: 'ctl' }, play, cur, h('span', { class: 'end' }, fmt(file.duration))), audio);
+  api(`/api/peaks?n=90&path=${encodeURIComponent(file.path)}`)
+    .then(levels => { bars.replaceChildren(...levels.map(v => h('span', { style: `height:${Math.max(3, v * 100)}%` }))); draw(); })
+    .catch(() => box.replaceChildren(h('div', { class: 'muted', style: 'text-align:center;font-size:14px' }, 'Не получилось показать звук этой записи.')));
+  draw();
+  return box;
+}
+function stopPreview() {
+  if (state.preview) { state.preview.pause(); state.preview = null; }
+}
+
+// предпросмотр видео: встаём на первую секунду — самый первый кадр у Телемоста чёрный
+function preview(file) {
+  const video = h('video', { class: 'pv', src: `/api/file?path=${encodeURIComponent(file.path)}`, controls: true, preload: 'metadata' });
+  video.addEventListener('loadedmetadata', () => { video.currentTime = Math.min(1, file.duration / 2); }, { once: true });
+  video.addEventListener('error', () => video.replaceWith(h('div', { class: 'wave muted', style: 'text-align:center;font-size:14px' },
+    'Не получилось показать видео из этой записи.')));
+  state.preview = video;
+  return video;
 }
 
 // --- звонок ---
 let pollTimer;
 async function openCall(id, seekTo) {
+  stopPreview();
   clearTimeout(pollTimer);
   const first = state.current !== id;
   state.current = id;
