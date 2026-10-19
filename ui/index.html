@@ -134,7 +134,7 @@
   .menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 5; min-width: 180px;
           background: var(--page); border: 1px solid var(--line); border-radius: 14px; padding: 4px; display: none; }
   .kebab.open .menu { display: grid; }
-  .menu button { text-align: left; border-radius: 10px; font-size: 14px; }
+  .menu button { text-align: left; border-radius: 10px; font-size: 14px; white-space: nowrap; }
   .menu button:hover { background: var(--soft); }
   .menu a { padding: 7px 14px; border-radius: 10px; font-size: 14px; display: flex; justify-content: space-between; gap: 16px; }
   .menu a:hover { background: var(--soft); }
@@ -319,7 +319,7 @@ function callMenu(c) {
   } }, 'Скопировать текст');
   const del = h('button', { class: 'danger', onclick: e => {
     e.stopPropagation(); kebab.classList.remove('open'); deleteCall(c);
-  } }, 'Удалить');
+  } }, 'Удалить расшифровку');
   const kebab = h('div', { class: 'kebab', onclick: e => e.stopPropagation() },
     icon(DOTS, 'Ещё', () => {
       const open = !kebab.classList.contains('open');
@@ -339,7 +339,7 @@ function deleteCall(c) {
   }, 15000);
   state.deleting.set(c.id, timer);
   if (wasOpen) showEmpty(); else renderList();
-  toast('Расшифровка удалена. Сама запись не тронута.', { action: 'Вернуть', ms: 15000, countdown: true, onAction: () => {
+  toast('Расшифровка удалена. Файл записи остался на месте.', { action: 'Вернуть', ms: 15000, countdown: true, onAction: () => {
     clearTimeout(timer); state.deleting.delete(c.id);
     if (wasOpen) openCall(c.id); else renderList();
   } });
