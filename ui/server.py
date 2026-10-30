@@ -9,6 +9,7 @@ import sys
 import tempfile
 import threading
 import time
+import unicodedata
 import webbrowser
 from contextlib import closing
 from datetime import datetime
@@ -239,7 +240,16 @@ def probe(path: str) -> float:
     try:
         return float(out.stdout.strip())
     except ValueError:
-        raise HTTPException(400, "Это не похоже на аудио- или видеофайл.")
+        pass
+    # у записей из браузера и OBS длительность в заголовке бывает не указана — досчитываем, прочитав звук
+    out = subprocess.run(["ffmpeg", "-nostdin", "-v", "info", "-i", path, "-vn", "-f", "null", "-"],
+                         capture_output=True, text=True)
+    times = re.findall(r"time=(\d+):(\d+):(\d+\.\d+)", out.stderr)
+    if times:
+        h, m, sec = times[-1]
+        return int(h) * 3600 + int(m) * 60 + float(sec)
+    print(f"probe: {path}: {out.stderr.strip()[-300:]}", file=sys.stderr)  # причина — в консоли сервера
+    raise HTTPException(400, f"«{Path(path).name}» не похоже на аудио- или видеофайл.")
 
 
 PICK_WINDOWS = """import sys, tkinter, tkinter.filedialog
@@ -281,6 +291,12 @@ class Relink(BaseModel):
     path: str | None = None
 
 
+class Dropped(BaseModel):
+    name: str
+    size: int
+    modified: float  # мс, как File.lastModified в браузере
+
+
 @app.get("/")
 def index():
     return FileResponse(UI_DIR / "index.html")
@@ -289,6 +305,38 @@ def index():
 @app.post("/api/pick")
 def pick():
     return file_info(choose_file("Выберите запись звонка"))
+
+
+@app.post("/api/locate")
+def locate(body: Dropped):
+    """Файл перетащили в окно: браузер не говорит путь, ищем на диске по имени, размеру и времени."""
+    path = find_dropped(body.name, body.size, body.modified / 1000)
+    if not path:
+        raise HTTPException(404, "Не нашёл этот файл на диске. Нажмите «Выбрать файл…».")
+    return file_info(path)
+
+
+SEARCH_DIRS = ["Documents", "Downloads", "Desktop", "Movies", "Videos", "Music"]
+
+
+def find_dropped(name: str, size: int, modified: float) -> str | None:
+    # macOS хранит имена в NFD, браузер отдаёт NFC — сравниваем в одной форме
+    def norm(s: str) -> str:
+        return unicodedata.normalize("NFC", s)
+
+    if WINDOWS:  # Spotlight нет — смотрим обычные папки
+        found = []
+        for d in SEARCH_DIRS:
+            for root, _, files in os.walk(Path.home() / d):
+                for f in files:
+                    if norm(f) == norm(name):
+                        found.append(os.path.join(root, f))
+    else:
+        out = subprocess.run(["mdfind", "-name", name], capture_output=True, text=True)
+        found = [p for p in out.stdout.splitlines() if norm(Path(p).name) == norm(name)]
+    same = [p for p in found if os.path.isfile(p) and os.path.getsize(p) == size]
+    # несколько копий одного файла — берём ту, у которой время изменения ближе
+    return min(same, key=lambda p: abs(os.path.getmtime(p) - modified), default=None)
 
 
 def file_info(path: str) -> dict:
