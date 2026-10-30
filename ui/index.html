@@ -167,7 +167,10 @@
   .wave .ctl .btn svg { width: 18px; height: 18px; }
   .wave .ctl .cur { color: var(--text); }
   .wave .ctl .end { margin-left: auto; }
-  .drop.over { border-color: var(--accent); background: var(--accent-soft); }
+  #dropzone { position: fixed; inset: 0; z-index: 20; padding: 16px; pointer-events: none;
+              background: color-mix(in srgb, var(--page) 70%, transparent); }
+  #dropzone > div { height: 100%; display: grid; place-items: center; border-radius: 24px; font-size: 18px; font-weight: 600;
+                    color: var(--accent); background: var(--accent-soft); border: 2px dashed var(--accent); }
   .toast { position: fixed; right: 28px; bottom: 24px; z-index: 9; background: var(--text); color: var(--page);
            padding: 10px 16px; border-radius: 16px; opacity: 0; transform: translateY(8px);
            transition: opacity .2s, transform .2s; pointer-events: none; font-size: 14px; max-width: min(420px, calc(100vw - 32px)); }
@@ -235,6 +238,7 @@
 </div>
 <button class="ink" id="follow" hidden>К текущей реплике</button>
 <div class="toast" id="toast" role="status"></div>
+<div id="dropzone" hidden><div>Отпустите, чтобы добавить файл</div></div>
 
 <script>
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -280,7 +284,7 @@ async function api(path, opts = {}) {
   }
   return res.json();
 }
-function toast(text, { action, onAction, ms = 2200, countdown = false } = {}) {
+function toast(text, { action, onAction, ms = 4000, countdown = false } = {}) {
   const t = $('#toast');
   clearTimeout(t._h); clearInterval(t._tick);
   const hide = () => { t.classList.remove('show', 'act'); clearInterval(t._tick); };
@@ -317,6 +321,12 @@ function callMenu(c) {
     e.stopPropagation(); kebab.classList.remove('open');
     try { await copyText(await api('/api/calls/' + c.id)); } catch (err) { toast(err.message); }
   } }, 'Скопировать текст');
+  const busy = c.status === 'queued' || c.status === 'running';
+  const stop = busy ? h('button', { onclick: async e => {
+    e.stopPropagation(); kebab.classList.remove('open');
+    try { await api(`/api/calls/${c.id}/cancel`, { method: 'POST' }); } catch (err) { toast(err.message); }
+    await loadList(); if (state.current === c.id) openCall(c.id);
+  } }, 'Отменить расшифровку') : null;
   const del = h('button', { class: 'danger', onclick: e => {
     e.stopPropagation(); kebab.classList.remove('open'); deleteCall(c);
   } }, 'Удалить расшифровку');
@@ -326,7 +336,7 @@ function callMenu(c) {
       document.querySelectorAll('.kebab.open').forEach(k => k.classList.remove('open'));
       kebab.classList.toggle('open', open);
     }),
-    h('div', { class: 'menu' }, copy, ren, del));
+    h('div', { class: 'menu' }, stop || copy, ren, del));
   return kebab;
 }
 // удаляем через 15 секунд, а до этого можно вернуть
@@ -400,6 +410,21 @@ $('#q').addEventListener('input', () => {
 });
 
 // --- новая запись ---
+// файл можно перетащить в любое место окна
+let dragDepth = 0;
+const dragging = on => $('#dropzone').hidden = !on;
+const hasFiles = e => [...e.dataTransfer.types].includes('Files');
+document.addEventListener('dragenter', e => { if (hasFiles(e)) { dragDepth++; dragging(true); } });
+document.addEventListener('dragleave', e => { if (hasFiles(e) && --dragDepth <= 0) { dragDepth = 0; dragging(false); } });
+document.addEventListener('dragover', e => { if (hasFiles(e)) e.preventDefault(); });
+document.addEventListener('drop', async e => {
+  if (!hasFiles(e)) return;
+  e.preventDefault(); dragDepth = 0; dragging(false);
+  const f = e.dataTransfer.files[0];
+  if (!f) return;
+  try { showSetup(await api('/api/locate', { method: 'POST', body: { name: f.name, size: f.size, modified: f.lastModified } })); }
+  catch (err) { toast(err.message, { ms: 5000 }); }
+});
 $('#pick').addEventListener('click', pickFile);
 async function pickFile() {
   try { showSetup(await api('/api/pick', { method: 'POST' })); }
@@ -412,13 +437,8 @@ function showEmpty() {
   const drop = h('div', { class: 'card drop' },
     h('div', { style: 'font-size:18px;font-weight:700' }, 'Новая расшифровка'),
     h('div', { class: 'muted', style: 'font-size:13px' }, '.webm · .mp4 · .mov · .m4a · .mp3 · .ogg · .wav'),
-    h('div', {}, h('button', { class: 'ink', onclick: pickFile }, 'Выбрать файл…')));
-  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
-  drop.addEventListener('dragleave', () => drop.classList.remove('over'));
-  drop.addEventListener('drop', e => {
-    e.preventDefault(); drop.classList.remove('over');
-    toast('Браузер не сообщает, где лежит файл. Нажмите «Выбрать файл…».');
-  });
+    h('div', {}, h('button', { class: 'ink', onclick: pickFile }, 'Выбрать файл…')),
+    h('div', { class: 'muted', style: 'font-size:13px' }, 'или перетащите запись в окно'));
   $('#main').replaceChildren(h('div', { class: 'empty' }, drop));
 }
 
